@@ -956,7 +956,7 @@
     <div id="page-settings" class="page">
         <div class="card">
             <div class="setting-item">
-                <label for="targetInput">每月目标天数</label>
+                <label for="targetInput">打卡目标天数</label>
                 <input type="number" id="targetInput" min="1" value="30" />
             </div>
             <button class="btn-save" id="btnSaveTarget">保存设置</button>
@@ -1181,7 +1181,7 @@
         </div>
     </div>
 
-    <!-- ===== 新增：关于模态框（已精简括号内容） ===== -->
+    <!-- ===== 关于模态框 ===== -->
     <div class="modal-overlay" id="aboutModal">
         <div class="modal-box">
             <h3>📌 关于本工具</h3>
@@ -2530,7 +2530,7 @@
             ctx.fillStyle = lightText;
             ctx.font = '12px -apple-system, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(`生成于 ${dateStr}  记录工具 v1.2`, W / 2, H - 30);
+            ctx.fillText(`生成于 ${dateStr}  记录工具 v1.3`, W / 2, H - 30);
             if (stats.records.length > 0) {
                 const last = stats.records[stats.records.length - 1];
                 const d = new Date(last.timestamp);
@@ -2616,7 +2616,7 @@
         if (localUserIdEl) localUserIdEl.textContent = DataService.getUserId();
         refreshAll();
         checkBackupReminder();
-        console.log('💡 刷关记录器已启动 v1.2（精简版：移除分享按钮，精简关于文案）');
+        console.log('💡 刷关记录器已启动 v1.3（修正：目标天数文案）');
     </script>
 
 </body>
