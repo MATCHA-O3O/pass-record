@@ -1,0 +1,21 @@
+{
+  "name": "港深通勤刷关记录",
+  "short_name": "刷关记录",
+  "description": "记录港深通关次数与地点，数据仅存本地",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f0f4f3",
+  "theme_color": "#2b7a78",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
