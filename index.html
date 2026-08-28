@@ -1,0 +1,2623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>港深通勤刷关记录</title>
+    <!-- ===== PWA 支持 ===== -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- ===================== -->
+    <style>
+        /* ===== 主题变量 ===== */
+        :root {
+            --bg-color: #f0f4f3;
+            --card-bg: #ffffff;
+            --text-primary: #1a2a2a;
+            --text-secondary: #555;
+            --text-light: #999;
+            --border-color: #e8ecec;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            --primary: #2b7a78;
+            --primary-light: #3aafa9;
+            --danger: #e85d75;
+            --cell-hover: #eef5f4;
+            --modal-overlay: rgba(0, 0, 0, 0.4);
+            --input-bg: #f8fafa;
+            --toast-bg: rgba(0, 0, 0, 0.75);
+            --toast-text: #fff;
+        }
+        [data-theme="dark"] {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #aaa;
+            --text-light: #777;
+            --border-color: #333;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            --primary: #4db6ac;
+            --primary-light: #80cbc4;
+            --danger: #ef9a9a;
+            --cell-hover: #2a2a2a;
+            --modal-overlay: rgba(0, 0, 0, 0.7);
+            --input-bg: #2a2a2a;
+            --toast-bg: rgba(255, 255, 255, 0.85);
+            --toast-text: #1a2a2a;
+        }
+        [data-theme="green"] {
+            --bg-color: #e8f5e9;
+            --card-bg: #f1fbf1;
+            --text-primary: #1a3a1a;
+            --text-secondary: #3a5a3a;
+            --text-light: #6a8a6a;
+            --border-color: #c8e6c9;
+            --shadow: 0 4px 20px rgba(0, 50, 0, 0.06);
+            --primary: #4caf50;
+            --primary-light: #81c784;
+            --danger: #e57373;
+            --cell-hover: #d4edd4;
+            --modal-overlay: rgba(0, 30, 0, 0.3);
+            --input-bg: #e8f5e9;
+            --toast-bg: rgba(0, 40, 0, 0.8);
+            --toast-text: #e8f5e9;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            padding: 20px 16px 80px;
+            max-width: 480px;
+            margin: 0 auto;
+            transition: background 0.3s, color 0.3s;
+        }
+        #toast-container {
+            position: fixed;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--toast-bg);
+            color: var(--toast-text);
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 500;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+            max-width: 80%;
+            text-align: center;
+        }
+        #toast-container.show {
+            opacity: 1;
+        }
+        .toolbar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .toolbar button {
+            background: none;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 30px;
+            color: var(--text-secondary);
+            transition: background 0.2s;
+            position: relative;
+        }
+        .toolbar button:hover {
+            background: var(--border-color);
+        }
+        .toolbar button[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            background: var(--toast-bg);
+            color: var(--toast-text);
+            padding: 4px 12px;
+            border-radius: 8px;
+            white-space: nowrap;
+            z-index: 50;
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            padding: 20px 18px;
+            margin-bottom: 18px;
+            transition: background 0.3s, box-shadow 0.3s;
+            border: 1px solid var(--border-color);
+        }
+        .stats-grid {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .stat-item {
+            text-align: center;
+            flex: 1;
+        }
+        .stat-number {
+            display: block;
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .stat-item.highlight .stat-number {
+            color: var(--danger);
+            font-size: 38px;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .streak-bar {
+            text-align: center;
+            font-size: 15px;
+            color: var(--text-secondary);
+            padding: 6px 0 0;
+            border-top: 1px solid var(--border-color);
+            margin-top: 10px;
+        }
+        .streak-bar .fire {
+            color: #f59e0b;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        .progress-text {
+            display: block;
+            text-align: right;
+            font-size: 13px;
+            color: var(--text-light);
+            margin-top: 6px;
+        }
+        .record-area {
+            display: flex;
+            justify-content: space-around;
+            gap: 16px;
+            margin: 30px 0 20px;
+        }
+        .btn-record {
+            flex: 1;
+            padding: 18px 0;
+            border: none;
+            border-radius: 60px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .btn-record:active {
+            transform: scale(0.94);
+        }
+        .btn-quick {
+            background: var(--border-color);
+            color: var(--primary);
+        }
+        .btn-location {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 6px 20px rgba(43, 122, 120, 0.3);
+        }
+        .tip {
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-light);
+            margin-top: 6px;
+        }
+        .last-record {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .last-title {
+            font-size: 15px;
+            color: var(--text-secondary);
+        }
+        .last-info {
+            font-size: 15px;
+            color: var(--text-primary);
+            max-width: 70%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .calendar-header .month-year {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        .calendar-header .nav-btn {
+            background: none;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            padding: 0 12px;
+            color: var(--primary);
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            text-align: center;
+        }
+        .calendar-grid .weekday {
+            font-size: 14px;
+            color: var(--text-light);
+            padding: 6px 0;
+            font-weight: 500;
+        }
+        .calendar-grid .day-cell {
+            position: relative;
+            padding: 8px 0;
+            border-radius: 50%;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background 0.15s;
+            background: transparent;
+            user-select: none;
+            color: var(--text-primary);
+            -webkit-touch-callout: none;
+        }
+        .calendar-grid .day-cell:hover {
+            background: var(--cell-hover);
+        }
+        .calendar-grid .day-cell.other-month {
+            color: var(--text-light);
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .calendar-grid .day-cell.today {
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .calendar-grid .day-cell.has-record::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--primary);
+        }
+        .calendar-grid .day-cell.has-record.today::after {
+            background: var(--danger);
+        }
+        .calendar-legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .calendar-legend span::before {
+            content: '●';
+            margin-right: 6px;
+            font-size: 16px;
+        }
+        .calendar-legend .legend-has::before {
+            color: var(--primary);
+        }
+        .calendar-legend .legend-none::before {
+            color: var(--border-color);
+        }
+        .filter-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .btn-clear {
+            background: var(--danger);
+            color: #fff;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .btn-undo {
+            background: var(--border-color);
+            color: var(--text-secondary);
+            border: none;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: opacity 0.2s, background 0.2s, color 0.2s;
+        }
+        .btn-undo.has-undo {
+            opacity: 1;
+            cursor: pointer;
+        }
+        .btn-undo.has-undo:hover {
+            background: var(--primary);
+            color: #fff;
+        }
+        .record-item {
+            display: flex;
+            flex-direction: column;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .record-item:last-child {
+            border-bottom: none;
+        }
+        .record-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        .record-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .record-date {
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 16px;
+        }
+        .record-time {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+        .record-location {
+            background: var(--border-color);
+            padding: 2px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .record-note {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            padding-left: 4px;
+            font-style: italic;
+            word-break: break-all;
+        }
+        .record-delete {
+            background: none;
+            border: none;
+            color: var(--danger);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0 8px;
+        }
+        .empty {
+            text-align: center;
+            color: var(--text-light);
+            padding: 40px 0;
+        }
+        .setting-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .setting-item label {
+            font-size: 16px;
+            color: var(--text-secondary);
+        }
+        .setting-item input[type="number"],
+        .setting-item input[type="time"] {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 16px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            width: 120px;
+        }
+        .setting-item textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            resize: vertical;
+            min-height: 60px;
+            margin-top: 8px;
+        }
+        .btn-save {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 60px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .btn-export {
+            width: 48%;
+            padding: 10px 0;
+            background: var(--border-color);
+            color: var(--text-primary);
+            border: none;
+            border-radius: 60px;
+            font-size: 15px;
+            cursor: pointer;
+            display: inline-block;
+            text-align: center;
+            margin-top: 8px;
+        }
+        .btn-export.primary {
+            background: var(--primary);
+            color: #fff;
+        }
+        .btn-import {
+            width: 100%;
+            padding: 10px 0;
+            background: var(--border-color);
+            color: var(--text-primary);
+            border: 1px dashed var(--primary);
+            border-radius: 60px;
+            font-size: 15px;
+            cursor: pointer;
+            display: inline-block;
+            text-align: center;
+            margin-top: 8px;
+            transition: background 0.2s;
+        }
+        .btn-import:hover {
+            background: var(--cell-hover);
+        }
+        .export-group {
+            display: flex;
+            gap: 4%;
+            flex-wrap: wrap;
+        }
+        .info-box {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        .mode-switch {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            justify-content: center;
+            padding: 8px 0;
+        }
+        .mode-switch .mode-label {
+            font-size: 16px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+        }
+        .mode-switch .mode-label.active {
+            color: var(--primary);
+            font-weight: 600;
+        }
+        .mode-switch input[type="checkbox"] {
+            width: 48px;
+            height: 28px;
+            appearance: none;
+            background: var(--border-color);
+            border-radius: 30px;
+            position: relative;
+            cursor: pointer;
+            outline: none;
+            transition: background 0.3s;
+            flex-shrink: 0;
+        }
+        .mode-switch input[type="checkbox"]:checked {
+            background: var(--primary);
+        }
+        .mode-switch input[type="checkbox"]::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 22px;
+            height: 22px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        .mode-switch input[type="checkbox"]:checked::after {
+            transform: translateX(20px);
+        }
+        .tabs {
+            display: flex;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border-top: 1px solid var(--border-color);
+            max-width: 480px;
+            margin: 0 auto;
+            z-index: 100;
+            transition: background 0.3s;
+        }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 12px 0 8px;
+            font-size: 14px;
+            color: var(--text-light);
+            cursor: pointer;
+        }
+        .tab.active {
+            color: var(--primary);
+            font-weight: 600;
+        }
+        .tab-icon {
+            font-size: 22px;
+            display: block;
+        }
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--modal-overlay);
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-box {
+            background: var(--card-bg);
+            border-radius: 24px;
+            padding: 30px 24px 24px;
+            max-width: 340px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        .modal-box h3 {
+            margin-bottom: 16px;
+            color: var(--primary);
+            font-size: 20px;
+        }
+        .modal-box .sub-info {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        .modal-box select,
+        .modal-box input,
+        .modal-box textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 30px;
+            border: 1px solid var(--border-color);
+            font-size: 16px;
+            margin-bottom: 12px;
+            outline: none;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            resize: vertical;
+        }
+        .modal-box textarea {
+            border-radius: 16px;
+            min-height: 70px;
+        }
+        .modal-box select:focus,
+        .modal-box input:focus {
+            border-color: var(--primary);
+        }
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .modal-actions button {
+            flex: 1;
+            padding: 12px 0;
+            border: none;
+            border-radius: 60px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-modal-confirm {
+            background: var(--primary);
+            color: #fff;
+        }
+        .btn-modal-cancel {
+            background: var(--border-color);
+            color: var(--text-secondary);
+        }
+        .location-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: -4px 0 12px;
+            justify-content: center;
+        }
+        .location-tags button {
+            padding: 4px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 30px;
+            background: var(--input-bg);
+            font-size: 14px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .location-tags button:active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+        .switch-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin: 8px 0 12px;
+            font-size: 15px;
+            color: var(--text-secondary);
+        }
+        .switch-wrap input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+        .time-input-container {
+            display: none;
+        }
+        .time-input-container.show {
+            display: block;
+        }
+        .hidden-by-mode {
+            display: none;
+        }
+        .mode-remark .hidden-by-mode.remark-show {
+            display: block;
+        }
+        .mode-remark .hidden-by-mode.remark-inline {
+            display: inline;
+        }
+        .mode-remark .hidden-by-mode.remark-flex {
+            display: flex;
+        }
+        .mode-remark .hidden-by-mode.remark-grid {
+            display: grid;
+        }
+        .action-sheet-overlay {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: var(--modal-overlay);
+            justify-content: flex-end;
+            z-index: 300;
+        }
+        .action-sheet-overlay.active {
+            display: flex;
+        }
+        .action-sheet {
+            background: var(--card-bg);
+            border-radius: 20px 20px 0 0;
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 20px 16px 30px;
+            text-align: center;
+            border-top: 1px solid var(--border-color);
+        }
+        .action-sheet .title {
+            font-size: 16px;
+            color: var(--text-secondary);
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 12px;
+        }
+        .action-sheet button {
+            display: block;
+            width: 100%;
+            padding: 16px 0;
+            border: none;
+            background: none;
+            font-size: 18px;
+            color: var(--primary);
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            -webkit-touch-callout: none;
+        }
+        .action-sheet button:last-child {
+            border-bottom: none;
+        }
+        .action-sheet button.danger {
+            color: var(--danger);
+        }
+        .action-sheet .cancel-btn {
+            margin-top: 12px;
+            color: var(--text-light);
+            font-weight: 600;
+            border-top: 1px solid var(--border-color);
+            padding-top: 16px;
+        }
+        #posterCanvas {
+            width: 100%;
+            border-radius: 16px;
+            margin-top: 12px;
+            border: 1px solid var(--border-color);
+        }
+        .poster-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .poster-actions button {
+            flex: 1;
+            padding: 12px 0;
+            border: none;
+            border-radius: 60px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        #importFileInput {
+            display: none;
+        }
+        .congrats-modal .modal-box {
+            background: linear-gradient(135deg, var(--card-bg), var(--bg-color));
+            border: 2px solid var(--primary);
+        }
+        .congrats-modal .modal-box h3 {
+            font-size: 28px;
+        }
+        .congrats-modal .modal-box .emoji-big {
+            font-size: 60px;
+            display: block;
+            margin-bottom: 8px;
+        }
+        /* ===== 分享按钮样式（已删除，但保留样式定义以防残留） ===== */
+        .share-btn {
+            display: none;
+        }
+        .about-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            cursor: pointer;
+            font-size: 15px;
+            padding: 8px 0;
+            width: 100%;
+            text-align: center;
+            border-top: 1px solid var(--border-color);
+            margin-top: 12px;
+            padding-top: 12px;
+        }
+        .about-btn:hover {
+            text-decoration: underline;
+        }
+        .about-list {
+            text-align: left;
+            padding-left: 4px;
+            font-size: 15px;
+            line-height: 1.8;
+        }
+        .about-list li {
+            list-style: none;
+            margin-bottom: 8px;
+        }
+        .about-list li::before {
+            content: '• ';
+            color: var(--primary);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toast-container"></div>
+
+    <div class="toolbar">
+        <button id="themeToggle" title="切换主题">☀️</button>
+        <button id="exportMenuBtn" title="导出数据">📤</button>
+        <button id="posterBtn" title="生成海报">🖼️</button>
+        <button id="reminderBtn" title="提醒设置">⏰</button>
+    </div>
+
+    <!-- ===== 首页 ===== -->
+    <div id="page-index" class="page active">
+        <div class="card">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-number" id="completedDays">0</span>
+                    <span class="stat-label">已完成</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="targetDays">30</span>
+                    <span class="stat-label">目标</span>
+                </div>
+                <div class="stat-item highlight">
+                    <span class="stat-number" id="remainingDays">30</span>
+                    <span class="stat-label">还差</span>
+                </div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <span class="progress-text" id="progressText">0%</span>
+            <div class="streak-bar" id="streakBar">🔥 已连续打卡 0 天</div>
+        </div>
+
+        <div class="record-area">
+            <button class="btn-record btn-quick" id="btnQuick">📌 快速打卡</button>
+            <button class="btn-record btn-location" id="btnLocation">📍 地点打卡</button>
+        </div>
+        <div class="tip">快速打卡不记录地点，地点打卡可选择口岸</div>
+
+        <div class="card last-record" id="lastRecordCard" style="display:none;">
+            <span class="last-title">📌 最近</span>
+            <span class="last-info" id="lastRecordInfo"></span>
+        </div>
+
+        <div class="card">
+            <div class="calendar-header">
+                <button class="nav-btn" id="prevMonth">‹</button>
+                <span class="month-year" id="monthYear">2025-01</span>
+                <button class="nav-btn" id="nextMonth">›</button>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+            <div class="calendar-legend">
+                <span class="legend-has">已打卡</span>
+                <span class="legend-none">未打卡</span>
+            </div>
+        </div>
+        <!-- 分享按钮已移除 -->
+    </div>
+
+    <!-- ===== 历史页 ===== -->
+    <div id="page-history" class="page">
+        <div class="card" style="padding-bottom:16px;">
+            <input type="text" id="historySearchInput" placeholder="🔍 搜索日期 / 口岸 / 备注" maxlength="50"
+                style="width:100%;padding:10px 16px;border-radius:30px;border:1px solid var(--border-color);font-size:15px;background:var(--input-bg);color:var(--text-primary);outline:none;margin-bottom:10px;" />
+            <select id="historyLocationFilter"
+                style="width:100%;padding:10px 16px;border-radius:30px;border:1px solid var(--border-color);font-size:15px;background:var(--input-bg);color:var(--text-primary);outline:none;">
+                <option value="">全部口岸</option>
+            </select>
+        </div>
+        <div class="card filter-bar">
+            <span id="historyCount">共 0 条记录</span>
+            <div style="display:flex; gap:6px;">
+                <button class="btn-undo" id="undoBtn">↩️ 撤销</button>
+                <button class="btn-clear" id="btnClear">清空全部</button>
+            </div>
+        </div>
+        <div class="card" id="historyList"></div>
+    </div>
+
+    <!-- ===== 设置页 ===== -->
+    <div id="page-settings" class="page">
+        <div class="card">
+            <div class="setting-item">
+                <label for="targetInput">每月目标天数</label>
+                <input type="number" id="targetInput" min="1" value="30" />
+            </div>
+            <button class="btn-save" id="btnSaveTarget">保存设置</button>
+        </div>
+
+        <div class="card">
+            <div class="setting-item" style="border-bottom: none; padding-bottom: 0;">
+                <label>📝 记录模式</label>
+                <div class="mode-switch">
+                    <span class="mode-label" id="modeLabelLight">轻简</span>
+                    <input type="checkbox" id="modeToggle" />
+                    <span class="mode-label active" id="modeLabelFull">记实</span>
+                </div>
+                <div style="font-size:13px;color:var(--text-light);text-align:center;width:100%;margin-top:4px;">
+                    <span id="modeDesc">支持备注与精确时间</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="setting-item" style="border-bottom: none; padding-bottom: 0;">
+                <label>📤 数据导入 / 导出</label>
+                <div class="export-group">
+                    <button class="btn-export" id="exportJSON">导出 JSON</button>
+                    <button class="btn-export primary" id="exportCSV">导出 CSV</button>
+                </div>
+                <button class="btn-import" id="importBtn">📥 导入 JSON（合并 / 覆盖）</button>
+                <div style="font-size:12px;color:var(--text-light);text-align:center;margin-top:6px;">
+                    导入会替换当前所有数据，请先导出备份
+                </div>
+            </div>
+        </div>
+
+        <div class="card info-box">
+            <div style="font-weight:600;margin-bottom:6px;">🔒 数据仅存本地</div>
+            <div>所有打卡记录仅保存在你当前浏览器的本地存储中，<strong>不会上传到任何服务器</strong>。</div>
+            <div style="margin-top:6px;font-size:13px;color:var(--text-light);">
+                ⚠️ 换设备、清除浏览器数据或使用隐私模式会导致数据丢失，建议定期导出备份。
+            </div>
+            <div style="margin-top:10px;">
+                <div id="storageUsageText" style="margin-bottom:6px;">当前记录约占用 0 KB</div>
+                <div class="progress-bar"><div class="progress-fill" id="storageUsageFill" style="width:0%;"></div></div>
+            </div>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-color);">
+                🆔 本机识别码：<span id="localUserIdDisplay" style="font-family:monospace;">-</span>
+                <div style="font-size:12px;margin-top:4px;">用于将来支持账号登录时区分数据归属，无需手动操作</div>
+            </div>
+            <!-- ===== 关于按钮 ===== -->
+            <button class="about-btn" id="aboutBtn">ℹ️ 关于本工具</button>
+            <!-- ======================== -->
+        </div>
+    </div>
+
+    <!-- ===== 底部导航 ===== -->
+    <div class="tabs">
+        <div class="tab active" data-page="index"><span class="tab-icon">📊</span> 记录</div>
+        <div class="tab" data-page="history"><span class="tab-icon">📋</span> 历史</div>
+        <div class="tab" data-page="settings"><span class="tab-icon">⚙️</span> 我的</div>
+    </div>
+
+    <!-- ===== 模态框：快速打卡 ===== -->
+    <div class="modal-overlay" id="quickModal">
+        <div class="modal-box">
+            <h3>📌 快速打卡</h3>
+            <div class="sub-info">不记录地点，时间默认当前</div>
+            <textarea id="quickNote" placeholder="备注（可选）" rows="2" class="hidden-by-mode remark-show" maxlength="200"></textarea>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" id="quickCancel">取消</button>
+                <button class="btn-modal-confirm" id="quickConfirm">确认打卡</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 模态框：地点打卡 ===== -->
+    <div class="modal-overlay" id="locationModal">
+        <div class="modal-box">
+            <h3>📍 选择口岸</h3>
+            <div class="location-tags" id="locationTags"></div>
+            <select id="modalLocationSelect">
+                <option value="福田口岸">福田口岸</option>
+                <option value="罗湖口岸">罗湖口岸</option>
+                <option value="深圳湾口岸">深圳湾口岸</option>
+                <option value="莲塘口岸">莲塘口岸</option>
+                <option value="皇岗口岸">皇岗口岸</option>
+                <option value="西九龙站">西九龙站（高铁）</option>
+                <option value="沙头角口岸">沙头角口岸</option>
+                <option value="港珠澳大桥口岸">港珠澳大桥口岸</option>
+            </select>
+            <textarea id="locationNote" placeholder="备注（可选）" rows="2" class="hidden-by-mode remark-show" maxlength="200"></textarea>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" id="modalCancel">取消</button>
+                <button class="btn-modal-confirm" id="modalConfirm">确认记录</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 模态框：补充打卡 ===== -->
+    <div class="modal-overlay" id="supplementModal">
+        <div class="modal-box">
+            <h3>📅 补充打卡</h3>
+            <div class="sub-info" id="supplementDateInfo">日期：2025-01-01</div>
+            <div class="switch-wrap hidden-by-mode remark-flex" id="timeSwitchWrap">
+                <label for="setTimeCheck">⏱️ 设置具体时间</label>
+                <input type="checkbox" id="setTimeCheck" />
+            </div>
+            <div class="time-input-container" id="timeContainer">
+                <input type="time" id="supplementTime" value="09:00" />
+            </div>
+            <select id="supplementLocationSelect">
+                <option value="" selected>不选地点</option>
+                <option value="福田口岸">福田口岸</option>
+                <option value="罗湖口岸">罗湖口岸</option>
+                <option value="深圳湾口岸">深圳湾口岸</option>
+                <option value="莲塘口岸">莲塘口岸</option>
+                <option value="皇岗口岸">皇岗口岸</option>
+                <option value="西九龙站">西九龙站（高铁）</option>
+                <option value="沙头角口岸">沙头角口岸</option>
+                <option value="港珠澳大桥口岸">港珠澳大桥口岸</option>
+            </select>
+            <textarea id="supplementNote" placeholder="备注（可选）" rows="2" class="hidden-by-mode remark-show" maxlength="200"></textarea>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" id="supplementCancel">取消</button>
+                <button class="btn-modal-confirm" id="supplementConfirm">确认补充</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 模态框：编辑记录 ===== -->
+    <div class="modal-overlay" id="editRecordModal">
+        <div class="modal-box">
+            <h3>✏️ 编辑记录</h3>
+            <div class="sub-info" id="editDateInfo">日期：2025-01-01</div>
+            <input type="time" id="editTime" value="09:00" />
+            <select id="editLocationSelect">
+                <option value="">不选地点</option>
+                <option value="福田口岸">福田口岸</option>
+                <option value="罗湖口岸">罗湖口岸</option>
+                <option value="深圳湾口岸">深圳湾口岸</option>
+                <option value="莲塘口岸">莲塘口岸</option>
+                <option value="皇岗口岸">皇岗口岸</option>
+                <option value="西九龙站">西九龙站（高铁）</option>
+                <option value="沙头角口岸">沙头角口岸</option>
+                <option value="港珠澳大桥口岸">港珠澳大桥口岸</option>
+            </select>
+            <textarea id="editNote" placeholder="备注" rows="2" maxlength="200"></textarea>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" id="editCancel">取消</button>
+                <button class="btn-modal-confirm" id="editConfirm">保存修改</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 模态框：仅修改地点（轻简模式） ===== -->
+    <div class="modal-overlay" id="modifyLocationModal">
+        <div class="modal-box">
+            <h3>📍 修改地点</h3>
+            <div class="sub-info" id="modifyDateInfo">日期：2025-01-01</div>
+            <select id="modifyLocationSelect">
+                <option value="">不选地点</option>
+                <option value="福田口岸">福田口岸</option>
+                <option value="罗湖口岸">罗湖口岸</option>
+                <option value="深圳湾口岸">深圳湾口岸</option>
+                <option value="莲塘口岸">莲塘口岸</option>
+                <option value="皇岗口岸">皇岗口岸</option>
+                <option value="西九龙站">西九龙站（高铁）</option>
+                <option value="沙头角口岸">沙头角口岸</option>
+                <option value="港珠澳大桥口岸">港珠澳大桥口岸</option>
+            </select>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" id="modifyCancel">取消</button>
+                <button class="btn-modal-confirm" id="modifyConfirm">确认修改</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 模态框：提醒设置 ===== -->
+    <div class="modal-overlay" id="reminderModal">
+        <div class="modal-box">
+            <h3>⏰ 每日提醒</h3>
+            <div class="sub-info" id="reminderSubInfo">设置每日提醒时间（浏览器需授权通知）</div>
+            <input type="time" id="reminderTime" value="20:00" />
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" id="reminderCancel">取消</button>
+                <button class="btn-modal-confirm" id="reminderConfirm">设置提醒</button>
+            </div>
+            <div style="margin-top:12px;font-size:13px;color:var(--text-light)" id="reminderStatus">未设置提醒</div>
+        </div>
+    </div>
+
+    <!-- ===== 模态框：海报 ===== -->
+    <div class="modal-overlay" id="posterModal">
+        <div class="modal-box" style="max-width:400px;">
+            <h3>🖼️ 打卡海报</h3>
+            <canvas id="posterCanvas" width="360" height="500"></canvas>
+            <div class="poster-actions">
+                <button class="btn-modal-cancel" id="posterClose">关闭</button>
+                <button class="btn-modal-confirm" id="posterDownload">保存图片</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== ActionSheet ===== -->
+    <div class="action-sheet-overlay" id="actionSheet">
+        <div class="action-sheet">
+            <div class="title" id="actionSheetTitle">操作日期：2025-01-01</div>
+            <button id="actionEdit" class="hidden-by-mode remark-inline">✏️ 编辑记录</button>
+            <button id="actionModifyLocationLight" class="hidden-by-mode" style="display:none;">📍 修改地点</button>
+            <button class="danger" id="actionClear">🗑️ 删除记录</button>
+            <button class="cancel-btn" id="actionCancel">取消</button>
+        </div>
+    </div>
+
+    <!-- ===== 模态框：通用确认框 ===== -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal-box">
+            <h3 id="confirmTitle">确认操作</h3>
+            <div class="sub-info" id="confirmMessage">确定要执行此操作吗？</div>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" id="confirmCancelBtn">取消</button>
+                <button class="btn-modal-confirm" id="confirmOkBtn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 新增：关于模态框（已精简括号内容） ===== -->
+    <div class="modal-overlay" id="aboutModal">
+        <div class="modal-box">
+            <h3>📌 关于本工具</h3>
+            <div style="text-align:left;padding:4px 0;">
+                <ul class="about-list">
+                    <li>这是一个纯前端工具，用于记录港深通勤的刷关次数和地点。</li>
+                    <li>🔒 所有数据仅保存在你当前浏览器的本地存储中，<strong>不会上传到任何服务器</strong>，换设备或清除浏览器数据会丢失。</li>
+                    <li>📱 建议收藏网页后添加到手机桌面，使用体验更接近 App。</li>
+                    <li>💾 建议定期在「我的」页面导出 JSON 备份。</li>
+                </ul>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-modal-confirm" id="aboutClose">知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 隐藏文件输入 ===== -->
+    <input type="file" id="importFileInput" accept=".json" />
+
+    <!-- ===== 恭喜模态框 ===== -->
+    <div class="modal-overlay congrats-modal" id="congratsModal">
+        <div class="modal-box">
+            <span class="emoji-big">🎉</span>
+            <h3>恭喜完成打卡目标！</h3>
+            <div class="sub-info" id="congratsText">你已经完成了打卡目标，继续保持！</div>
+            <div class="modal-actions">
+                <button class="btn-modal-confirm" id="congratsClose">太棒了！</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================================================================
+        // 0. 安全：HTML 转义工具
+        // ================================================================
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // ================================================================
+        // 1. 数据服务层
+        // ================================================================
+        const DataService = {
+            _key: 'records',
+            _targetKey: 'targetDays',
+            _reminderKey: 'reminderTime',
+            _reminderLastFiredKey: 'reminderLastFired',
+            _modeKey: 'recordMode',
+            _themeKey: 'themeIndex',
+            _congratsKey: 'congratsShownForTarget',
+            _userIdKey: 'localUserId',
+
+            getRecords() {
+                try { return JSON.parse(localStorage.getItem(this._key)) || []; } catch { return []; }
+            },
+            saveRecords(records) {
+                try {
+                    localStorage.setItem(this._key, JSON.stringify(records));
+                    return true;
+                } catch (e) {
+                    console.error('保存记录失败', e);
+                    return false;
+                }
+            },
+            getTarget() {
+                const v = parseInt(localStorage.getItem(this._targetKey));
+                return (isNaN(v) || v < 1) ? 30 : v;
+            },
+            saveTarget(v) {
+                localStorage.setItem(this._targetKey, String(v));
+            },
+            getReminderTime() {
+                return localStorage.getItem(this._reminderKey) || null;
+            },
+            saveReminderTime(t) {
+                if (t === null) {
+                    localStorage.removeItem(this._reminderKey);
+                } else {
+                    localStorage.setItem(this._reminderKey, t);
+                }
+            },
+            getReminderLastFiredDate() {
+                return localStorage.getItem(this._reminderLastFiredKey) || '';
+            },
+            saveReminderLastFiredDate(dateKey) {
+                localStorage.setItem(this._reminderLastFiredKey, dateKey);
+            },
+            getRecordMode() {
+                return localStorage.getItem(this._modeKey) || 'full';
+            },
+            saveRecordMode(mode) {
+                localStorage.setItem(this._modeKey, mode);
+            },
+            getThemeIndex() {
+                return parseInt(localStorage.getItem(this._themeKey)) || 0;
+            },
+            saveThemeIndex(idx) {
+                localStorage.setItem(this._themeKey, String(idx));
+            },
+            getCongratsTarget() {
+                return parseInt(localStorage.getItem(this._congratsKey)) || 0;
+            },
+            setCongratsTarget(target) {
+                localStorage.setItem(this._congratsKey, String(target));
+            },
+            getUserId() {
+                let id = localStorage.getItem(this._userIdKey);
+                if (!id) {
+                    id = 'u_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+                    localStorage.setItem(this._userIdKey, id);
+                }
+                return id;
+            },
+            importRecords(records) {
+                if (!Array.isArray(records)) throw new Error('数据格式错误');
+                return this.saveRecords(records);
+            }
+        };
+
+        function getStorageUsageKB() {
+            try {
+                const raw = localStorage.getItem(DataService._key) || '';
+                return (new Blob([raw]).size / 1024).toFixed(1);
+            } catch {
+                return '0';
+            }
+        }
+
+        function handleSaveResult(ok) {
+            if (!ok) {
+                showConfirmDialog(
+                    '本地存储空间可能已满或写入失败，刚才的修改未能保存成功。建议立即导出备份，并考虑清理一些旧记录。',
+                    function() {
+                        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                        document.querySelector('.tab[data-page="settings"]').classList.add('active');
+                        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                        document.getElementById('page-settings').classList.add('active');
+                        renderSettings();
+                    },
+                    { title: '⚠️ 保存失败', okText: '去导出备份' }
+                );
+            }
+            return ok;
+        }
+
+        // ================================================================
+        // 2. 撤销系统（仅针对删除，按天过期）
+        // ================================================================
+        const UndoSystem = {
+            stack: [],
+            maxSize: 30,
+
+            push(action) {
+                if (action.type !== 'delete' && action.type !== 'deleteDate') {
+                    return;
+                }
+                action._pushedOnKey = getTodayKey();
+                if (this.stack.length > 0 && this.stack[this.stack.length - 1]._pushedOnKey !== action._pushedOnKey) {
+                    this.stack = [];
+                }
+                this.stack.push(action);
+                if (this.stack.length > this.maxSize) {
+                    this.stack.shift();
+                }
+                this.updateUI();
+            },
+
+            pop() {
+                if (this.stack.length === 0) return null;
+                const action = this.stack.pop();
+                this.updateUI();
+                return action;
+            },
+
+            clear() {
+                this.stack = [];
+                this.updateUI();
+            },
+
+            hasUndo() {
+                return this.stack.length > 0;
+            },
+
+            updateUI() {
+                const btn = document.getElementById('undoBtn');
+                if (btn) {
+                    if (this.hasUndo()) {
+                        btn.classList.add('has-undo');
+                        btn.textContent = '↩️ 撤销 (' + this.stack.length + ')';
+                    } else {
+                        btn.classList.remove('has-undo');
+                        btn.textContent = '↩️ 撤销';
+                    }
+                }
+            },
+
+            recordDelete(id, record) {
+                this.push({ type: 'delete', id: id, data: record, dateKey: record.dateKey });
+            },
+            recordDeleteDate(dateKey, records) {
+                this.push({ type: 'deleteDate', dateKey: dateKey, data: records });
+            },
+
+            undo() {
+                const action = this.pop();
+                if (!action) return false;
+                const records = DataService.getRecords();
+                switch (action.type) {
+                    case 'delete':
+                        records.push(action.data);
+                        DataService.saveRecords(records);
+                        showToast(`↩️ 已恢复 ${action.dateKey} 的记录`);
+                        break;
+                    case 'deleteDate':
+                        action.data.forEach(r => records.push(r));
+                        DataService.saveRecords(records);
+                        showToast(action.dateKey === 'all' ? '↩️ 已恢复全部记录' : `↩️ 已恢复 ${action.dateKey} 的记录`);
+                        break;
+                    default:
+                        return false;
+                }
+                refreshAll();
+                return true;
+            }
+        };
+
+        // ================================================================
+        // 3. Toast
+        // ================================================================
+        let toastTimer = null;
+
+        function showToast(message, duration = 1800) {
+            const el = document.getElementById('toast-container');
+            el.textContent = message;
+            el.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => { el.classList.remove('show'); }, duration);
+        }
+
+        // ================================================================
+        // 3.5 自定义确认框
+        // ================================================================
+        let _confirmCallback = null;
+
+        function showConfirmDialog(message, onConfirm, opts) {
+            opts = opts || {};
+            document.getElementById('confirmTitle').textContent = opts.title || '确认操作';
+            document.getElementById('confirmMessage').textContent = message;
+            const okBtn = document.getElementById('confirmOkBtn');
+            okBtn.textContent = opts.okText || '确认';
+            okBtn.style.background = opts.danger ? 'var(--danger)' : 'var(--primary)';
+            _confirmCallback = onConfirm;
+            document.getElementById('confirmModal').classList.add('active');
+        }
+
+        function closeConfirmDialog() {
+            document.getElementById('confirmModal').classList.remove('active');
+            _confirmCallback = null;
+        }
+
+        document.getElementById('confirmCancelBtn').addEventListener('click', closeConfirmDialog);
+        document.getElementById('confirmModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeConfirmDialog();
+        });
+        document.getElementById('confirmOkBtn').addEventListener('click', () => {
+            const cb = _confirmCallback;
+            document.getElementById('confirmModal').classList.remove('active');
+            _confirmCallback = null;
+            if (cb) cb();
+        });
+
+        // ================================================================
+        // 4. 核心业务
+        // ================================================================
+        function getTodayKey() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+
+        function hasRecordOnDate(dateKey) {
+            const records = DataService.getRecords();
+            return records.some(r => r.dateKey === dateKey);
+        }
+
+        function addRecord(location, customDate, customTime, note) {
+            const targetDateKey = customDate || getTodayKey();
+            if (hasRecordOnDate(targetDateKey)) {
+                showToast('⚠️ 这一天已经打过卡了，如需修改请使用编辑功能');
+                return null;
+            }
+
+            let dateKey, timestamp;
+            const now = new Date();
+            let targetDate = new Date();
+            if (customDate) {
+                const parts = customDate.split('-').map(Number);
+                targetDate = new Date(parts[0], parts[1] - 1, parts[2]);
+                if (isNaN(targetDate.getTime())) targetDate = now;
+            }
+            let hours = 0,
+                minutes = 0;
+            if (customTime) {
+                const t = customTime.split(':');
+                hours = parseInt(t[0]) || 0;
+                minutes = parseInt(t[1]) || 0;
+            } else {
+                if (customDate) { hours = 0;
+                    minutes = 0; } else { const n = new Date();
+                    hours = n.getHours();
+                    minutes = n.getMinutes(); }
+            }
+            const finalDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), hours, minutes,
+                0);
+            dateKey = `${finalDate.getFullYear()}-${String(finalDate.getMonth()+1).padStart(2,'0')}-${String(finalDate.getDate()).padStart(2,'0')}`;
+            timestamp = finalDate.toISOString();
+            const record = {
+                id: Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                userId: DataService.getUserId(),
+                dateKey: dateKey,
+                timestamp: timestamp,
+                location: (location || '').slice(0, 50),
+                note: (note || '').slice(0, 200)
+            };
+            const records = DataService.getRecords();
+            records.push(record);
+            const ok = DataService.saveRecords(records);
+            if (!handleSaveResult(ok)) return null;
+
+            checkAndShowCongrats();
+            return record;
+        }
+
+        function deleteRecordById(id) {
+            const records = DataService.getRecords();
+            const found = records.find(r => r.id === id);
+            const filtered = records.filter(r => r.id !== id);
+            const ok = DataService.saveRecords(filtered);
+            if (ok && found) UndoSystem.recordDelete(id, found);
+            handleSaveResult(ok);
+            return ok;
+        }
+
+        function deleteRecordsByDate(dateKey) {
+            const records = DataService.getRecords();
+            const toDelete = records.filter(r => r.dateKey === dateKey);
+            const filtered = records.filter(r => r.dateKey !== dateKey);
+            const ok = DataService.saveRecords(filtered);
+            if (ok && toDelete.length > 0) UndoSystem.recordDeleteDate(dateKey, toDelete);
+            handleSaveResult(ok);
+            return ok;
+        }
+
+        function updateRecordByDate(dateKey, newLocation, newNote, newTime) {
+            const records = DataService.getRecords();
+            const newRecords = records.map(r => {
+                if (r.dateKey === dateKey) {
+                    if (newLocation !== undefined) r.location = (newLocation || '').slice(0, 50);
+                    if (newNote !== undefined) r.note = (newNote || '').slice(0, 200);
+                    if (newTime) {
+                        const oldDate = new Date(r.timestamp);
+                        const t = newTime.split(':');
+                        const h = parseInt(t[0]) || 0,
+                            m = parseInt(t[1]) || 0;
+                        const newDate = new Date(oldDate.getFullYear(), oldDate.getMonth(), oldDate.getDate(), h, m);
+                        r.timestamp = newDate.toISOString();
+                    }
+                }
+                return r;
+            });
+            return DataService.saveRecords(newRecords);
+        }
+
+        function updateLocationOnly(dateKey, newLocation) {
+            const records = DataService.getRecords();
+            const newRecords = records.map(r => {
+                if (r.dateKey === dateKey) {
+                    r.location = (newLocation || '').slice(0, 50);
+                }
+                return r;
+            });
+            return DataService.saveRecords(newRecords);
+        }
+
+        function getRecordsByDate(dateKey) {
+            return DataService.getRecords().filter(r => r.dateKey === dateKey);
+        }
+
+        function calcStats() {
+            const records = DataService.getRecords();
+            const uniqueDates = new Set(records.map(r => r.dateKey));
+            const completed = uniqueDates.size;
+            const target = DataService.getTarget();
+            const remaining = Math.max(0, target - completed);
+            const progress = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0;
+            return { completed, target, remaining, progress, records };
+        }
+
+        function getCheckedDates() {
+            return new Set(DataService.getRecords().map(r => r.dateKey));
+        }
+
+        function isDefaultTime(timestamp) {
+            const d = new Date(timestamp);
+            return d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0;
+        }
+
+        function calcStreak() {
+            const records = DataService.getRecords();
+            if (records.length === 0) return 0;
+            const dates = [...new Set(records.map(r => r.dateKey))].sort();
+            if (dates.length === 0) return 0;
+            const today = getTodayKey();
+            let hasToday = dates.includes(today);
+            let streak = 0;
+            let checkDate = new Date();
+            if (!hasToday) checkDate.setDate(checkDate.getDate() - 1);
+            for (let i = 0; i < 365; i++) {
+                const dateKey =
+                    `${checkDate.getFullYear()}-${String(checkDate.getMonth()+1).padStart(2,'0')}-${String(checkDate.getDate()).padStart(2,'0')}`;
+                if (dates.includes(dateKey)) { streak++; } else { break; }
+                checkDate.setDate(checkDate.getDate() - 1);
+            }
+            return streak;
+        }
+
+        // ================================================================
+        // 5. 达标恭喜弹窗
+        // ================================================================
+        function checkAndShowCongrats() {
+            const stats = calcStats();
+            const target = stats.target;
+            const completed = stats.completed;
+            if (completed >= target) {
+                const savedTarget = DataService.getCongratsTarget();
+                if (savedTarget !== target) {
+                    document.getElementById('congratsText').textContent =
+                        `你已经完成了 ${target} 天的打卡目标！🎊 继续坚持，保持好习惯！`;
+                    document.getElementById('congratsModal').classList.add('active');
+                    DataService.setCongratsTarget(target);
+                }
+            }
+        }
+
+        document.getElementById('congratsClose').addEventListener('click', function() {
+            document.getElementById('congratsModal').classList.remove('active');
+        });
+        document.getElementById('congratsModal').addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('active');
+        });
+
+        // ================================================================
+        // 6. 振动
+        // ================================================================
+        function vibrateFeedback() {
+            if (navigator.vibrate) navigator.vibrate(15);
+        }
+
+        // ================================================================
+        // 7. 模式控制
+        // ================================================================
+        let currentMode = 'full';
+
+        function applyMode(mode) {
+            currentMode = mode;
+            const html = document.documentElement;
+            const editBtn = document.getElementById('actionEdit');
+            const modifyBtn = document.getElementById('actionModifyLocationLight');
+            if (mode === 'light') {
+                html.classList.remove('mode-remark');
+                document.querySelectorAll('.hidden-by-mode.remark-show').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.hidden-by-mode.remark-inline').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.hidden-by-mode.remark-flex').forEach(el => el.style.display = 'none');
+                if (editBtn) editBtn.style.display = 'none';
+                if (modifyBtn) modifyBtn.style.display = '';
+                document.getElementById('modeLabelLight').classList.add('active');
+                document.getElementById('modeLabelFull').classList.remove('active');
+                document.getElementById('modeDesc').textContent = '纯打卡，可修改地点';
+                document.getElementById('modeToggle').checked = false;
+            } else {
+                html.classList.add('mode-remark');
+                document.querySelectorAll('.hidden-by-mode.remark-show').forEach(el => el.style.display = '');
+                document.querySelectorAll('.hidden-by-mode.remark-inline').forEach(el => el.style.display = '');
+                document.querySelectorAll('.hidden-by-mode.remark-flex').forEach(el => el.style.display = '');
+                if (editBtn) editBtn.style.display = '';
+                if (modifyBtn) modifyBtn.style.display = 'none';
+                document.getElementById('modeLabelLight').classList.remove('active');
+                document.getElementById('modeLabelFull').classList.add('active');
+                document.getElementById('modeDesc').textContent = '支持备注与精确时间';
+                document.getElementById('modeToggle').checked = true;
+            }
+            DataService.saveRecordMode(mode);
+        }
+
+        const savedMode = DataService.getRecordMode();
+        applyMode(savedMode);
+
+        document.getElementById('modeToggle').addEventListener('change', function() {
+            this.checked ? applyMode('full') : applyMode('light');
+            refreshAll();
+        });
+
+        // ================================================================
+        // 8. 日历渲染
+        // ================================================================
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth();
+
+        function renderCalendar() {
+            const checked = getCheckedDates();
+            const grid = document.getElementById('calendarGrid');
+            const monthYear = document.getElementById('monthYear');
+            monthYear.textContent = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}`;
+            const firstDay = new Date(currentYear, currentMonth, 1);
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            const startDayOfWeek = firstDay.getDay();
+            const prevMonthLastDay = new Date(currentYear, currentMonth, 0).getDate();
+            let html = '';
+            ['日', '一', '二', '三', '四', '五', '六'].forEach(w => {
+                html += `<div class="weekday">${w}</div>`;
+            });
+            for (let i = 0; i < startDayOfWeek; i++) {
+                html += `<div class="day-cell other-month">${prevMonthLastDay - startDayOfWeek + i + 1}</div>`;
+            }
+            const todayStr = getTodayKey();
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateKey = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const isToday = dateKey === todayStr;
+                const hasRecord = checked.has(dateKey);
+                let cls = 'day-cell';
+                if (hasRecord) cls += ' has-record';
+                if (isToday) cls += ' today';
+                html += `<div class="${cls}" data-date="${dateKey}">${d}</div>`;
+            }
+            const total = startDayOfWeek + daysInMonth;
+            for (let i = 1; i <= (7 - total % 7) % 7; i++) {
+                html += `<div class="day-cell other-month">${i}</div>`;
+            }
+            grid.innerHTML = html;
+            grid.querySelectorAll('.day-cell:not(.other-month)').forEach(cell => {
+                const dateKey = cell.dataset.date;
+                const hasRecord = cell.classList.contains('has-record');
+                cell.addEventListener('click', function(e) {
+                    if (hasRecord) { showToast('该日已打卡 ✅'); } else { openSupplementModal(dateKey); }
+                });
+                let longPressTimer = null;
+                const startLongPress = (e) => {
+                    if (!hasRecord) return;
+                    longPressTimer = setTimeout(() => { e.preventDefault();
+                        vibrateFeedback();
+                        showActionSheet(dateKey); }, 400);
+                };
+                const cancelLongPress = () => clearTimeout(longPressTimer);
+                cell.addEventListener('touchstart', startLongPress, { passive: false });
+                cell.addEventListener('touchend', cancelLongPress);
+                cell.addEventListener('touchmove', cancelLongPress);
+                cell.addEventListener('mousedown', startLongPress);
+                cell.addEventListener('mouseup', cancelLongPress);
+                cell.addEventListener('mouseleave', cancelLongPress);
+            });
+        }
+
+        // ================================================================
+        // 9. ActionSheet
+        // ================================================================
+        let actionDate = '';
+
+        function showActionSheet(dateKey) {
+            actionDate = dateKey;
+            document.getElementById('actionSheetTitle').textContent = `操作日期：${dateKey}`;
+            document.getElementById('actionSheet').classList.add('active');
+        }
+        document.getElementById('actionCancel').addEventListener('click', () => {
+            document.getElementById('actionSheet').classList.remove('active');
+        });
+        document.getElementById('actionSheet').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) document.getElementById('actionSheet').classList.remove('active');
+        });
+        document.getElementById('actionEdit').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.getElementById('actionSheet').classList.remove('active');
+            if (currentMode === 'full') { openEditModal(actionDate); } else { showToast('轻简模式下不可编辑'); }
+        });
+        document.getElementById('actionModifyLocationLight').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.getElementById('actionSheet').classList.remove('active');
+            if (currentMode === 'light') { openModifyLocationModal(actionDate); } else { showToast(
+                    '记实模式下请使用"编辑记录"'); }
+        });
+        document.getElementById('actionClear').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.getElementById('actionSheet').classList.remove('active');
+            showConfirmDialog(`确认删除 ${actionDate} 的所有打卡记录吗？`, function() {
+                const ok = deleteRecordsByDate(actionDate);
+                refreshAll();
+                if (handleSaveResult(ok)) showToast('已删除该天记录');
+            }, { title: '删除记录', danger: true, okText: '删除' });
+        });
+
+        // ================================================================
+        // 10. 模态框：修改地点（轻简）
+        // ================================================================
+        let modifyDate = '';
+
+        function openModifyLocationModal(dateKey) {
+            modifyDate = dateKey;
+            const records = getRecordsByDate(dateKey);
+            if (records.length === 0) { showToast('该日无记录'); return; }
+            document.getElementById('modifyDateInfo').textContent = `日期：${dateKey}`;
+            document.getElementById('modifyLocationSelect').value = records[0].location || '';
+            document.getElementById('modifyLocationModal').classList.add('active');
+        }
+        document.getElementById('modifyCancel').addEventListener('click', () => {
+            document.getElementById('modifyLocationModal').classList.remove('active');
+        });
+        document.getElementById('modifyLocationModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) document.getElementById('modifyLocationModal').classList.remove('active');
+        });
+        document.getElementById('modifyConfirm').addEventListener('click', function() {
+            const newLoc = document.getElementById('modifyLocationSelect').value;
+            const ok = updateLocationOnly(modifyDate, newLoc);
+            document.getElementById('modifyLocationModal').classList.remove('active');
+            refreshAll();
+            if (handleSaveResult(ok)) showToast('✅ 地点已更新');
+        });
+
+        // ================================================================
+        // 11. 快速打卡
+        // ================================================================
+        document.getElementById('btnQuick').addEventListener('click', function() {
+            document.getElementById('quickNote').value = '';
+            document.getElementById('quickModal').classList.add('active');
+        });
+        document.getElementById('quickCancel').addEventListener('click', () => {
+            document.getElementById('quickModal').classList.remove('active');
+        });
+        document.getElementById('quickModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) document.getElementById('quickModal').classList.remove('active');
+        });
+        document.getElementById('quickConfirm').addEventListener('click', function() {
+            const note = (currentMode === 'full') ? document.getElementById('quickNote').value.trim() : '';
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            const result = addRecord('', null, timeStr, note);
+            if (result) {
+                document.getElementById('quickModal').classList.remove('active');
+                vibrateFeedback();
+                refreshAll();
+                showToast('✅ 打卡成功' + (note ? ' 📝' : ''));
+            }
+        });
+
+        // ================================================================
+        // 12. 地点打卡（含动态快捷标签）
+        // ================================================================
+        function generateLocationTags() {
+            const records = DataService.getRecords();
+            const freq = {};
+            records.forEach(r => {
+                if (r.location) {
+                    freq[r.location] = (freq[r.location] || 0) + 1;
+                }
+            });
+            const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+            const top3 = sorted.slice(0, 3).map(item => item[0]);
+            const container = document.getElementById('locationTags');
+            container.innerHTML = '';
+            if (top3.length === 0) {
+                const span = document.createElement('span');
+                span.textContent = '暂无常用口岸';
+                span.style.color = 'var(--text-light)';
+                span.style.fontSize = '14px';
+                container.appendChild(span);
+                return;
+            }
+            top3.forEach(loc => {
+                const btn = document.createElement('button');
+                btn.textContent = loc.replace('口岸', '');
+                btn.dataset.loc = loc;
+                btn.addEventListener('click', function() {
+                    const opt = Array.from(document.getElementById('modalLocationSelect').options)
+                        .find(o => o.value === loc);
+                    if (opt) {
+                        document.getElementById('modalLocationSelect').value = loc;
+                    }
+                    this.style.background = 'var(--primary)';
+                    this.style.color = '#fff';
+                    setTimeout(() => { this.style.background = '';
+                        this.style.color = ''; }, 200);
+                });
+                container.appendChild(btn);
+            });
+        }
+
+        document.getElementById('btnLocation').addEventListener('click', function() {
+            document.getElementById('locationNote').value = '';
+            generateLocationTags();
+            document.getElementById('locationModal').classList.add('active');
+        });
+
+        document.getElementById('modalCancel').addEventListener('click', () => {
+            document.getElementById('locationModal').classList.remove('active');
+        });
+        document.getElementById('locationModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) document.getElementById('locationModal').classList.remove('active');
+        });
+        document.getElementById('modalConfirm').addEventListener('click', function() {
+            const loc = document.getElementById('modalLocationSelect').value;
+            const note = (currentMode === 'full') ? document.getElementById('locationNote').value.trim() : '';
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            const result = addRecord(loc, null, timeStr, note);
+            if (result) {
+                document.getElementById('locationModal').classList.remove('active');
+                vibrateFeedback();
+                refreshAll();
+                showToast('✅ 地点打卡成功 📍' + (note ? ' 📝' : ''));
+            }
+        });
+
+        // ================================================================
+        // 13. 补充打卡
+        // ================================================================
+        let supplementDate = '';
+
+        function openSupplementModal(dateKey) {
+            supplementDate = dateKey;
+            document.getElementById('supplementDateInfo').textContent = `日期：${dateKey}`;
+            if (currentMode === 'full') {
+                document.getElementById('timeSwitchWrap').style.display = '';
+                document.getElementById('setTimeCheck').checked = false;
+                document.getElementById('timeContainer').classList.remove('show');
+            } else {
+                document.getElementById('timeSwitchWrap').style.display = 'none';
+                document.getElementById('timeContainer').classList.remove('show');
+            }
+            document.getElementById('supplementNote').value = '';
+            const now = new Date();
+            document.getElementById('supplementTime').value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            document.getElementById('supplementModal').classList.add('active');
+        }
+        document.getElementById('setTimeCheck').addEventListener('change', function() {
+            if (currentMode === 'full') {
+                const container = document.getElementById('timeContainer');
+                this.checked ? container.classList.add('show') : container.classList.remove('show');
+            }
+        });
+        document.getElementById('supplementCancel').addEventListener('click', () => {
+            document.getElementById('supplementModal').classList.remove('active');
+        });
+        document.getElementById('supplementModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) document.getElementById('supplementModal').classList.remove('active');
+        });
+        document.getElementById('supplementConfirm').addEventListener('click', function() {
+            const location = document.getElementById('supplementLocationSelect').value;
+            const note = (currentMode === 'full') ? document.getElementById('supplementNote').value.trim() : '';
+            let time = null;
+            if (currentMode === 'full' && document.getElementById('setTimeCheck').checked) {
+                time = document.getElementById('supplementTime').value;
+            }
+            const result = addRecord(location, supplementDate, time, note);
+            if (result) {
+                document.getElementById('supplementModal').classList.remove('active');
+                vibrateFeedback();
+                refreshAll();
+                showToast(`✅ 补充打卡成功 📅${note ? ' 📝' : ''}`);
+            }
+        });
+
+        // ================================================================
+        // 14. 编辑记录（记实）
+        // ================================================================
+        let editDate = '';
+
+        function openEditModal(dateKey) {
+            if (currentMode !== 'full') { showToast('仅记实模式支持编辑'); return; }
+            editDate = dateKey;
+            const records = getRecordsByDate(dateKey);
+            if (records.length === 0) { showToast('该日无记录'); return; }
+            const r = records[0];
+            const d = new Date(r.timestamp);
+            const timeStr = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            document.getElementById('editDateInfo').textContent = `日期：${dateKey}`;
+            document.getElementById('editTime').value = timeStr;
+            document.getElementById('editLocationSelect').value = r.location || '';
+            document.getElementById('editNote').value = r.note || '';
+            document.getElementById('editRecordModal').classList.add('active');
+        }
+        document.getElementById('editCancel').addEventListener('click', () => {
+            document.getElementById('editRecordModal').classList.remove('active');
+        });
+        document.getElementById('editRecordModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) document.getElementById('editRecordModal').classList.remove('active');
+        });
+        document.getElementById('editConfirm').addEventListener('click', function() {
+            const newLoc = document.getElementById('editLocationSelect').value;
+            const newTime = document.getElementById('editTime').value;
+            const newNote = document.getElementById('editNote').value.trim();
+            const ok = updateRecordByDate(editDate, newLoc, newNote, newTime);
+            document.getElementById('editRecordModal').classList.remove('active');
+            refreshAll();
+            if (handleSaveResult(ok)) showToast('✅ 记录已更新');
+        });
+
+        // ================================================================
+        // 15. 撤销按钮
+        // ================================================================
+        document.getElementById('undoBtn').addEventListener('click', function() {
+            if (!UndoSystem.hasUndo()) {
+                showToast('没有可撤销的删除操作');
+                return;
+            }
+            UndoSystem.undo();
+        });
+
+        // ================================================================
+        // 16. 渲染
+        // ================================================================
+        function renderIndex() {
+            const stats = calcStats();
+            document.getElementById('completedDays').textContent = stats.completed;
+            document.getElementById('targetDays').textContent = stats.target;
+            document.getElementById('remainingDays').textContent = stats.remaining;
+            document.getElementById('progressFill').style.width = stats.progress + '%';
+            document.getElementById('progressText').textContent = stats.progress + '%';
+            const streak = calcStreak();
+            document.getElementById('streakBar').innerHTML = `🔥 已连续打卡 <strong>${streak}</strong> 天`;
+            const last = stats.records.length > 0 ? stats.records[stats.records.length - 1] : null;
+            const lastCard = document.getElementById('lastRecordCard');
+            const lastInfo = document.getElementById('lastRecordInfo');
+            if (last) {
+                const d = new Date(last.timestamp);
+                const t = (isDefaultTime(last.timestamp)) ? '' : ` ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                const loc = last.location ? '📍' + last.location : '';
+                const note = last.note ? `✏️${last.note}` : '';
+                lastInfo.textContent = `${last.dateKey}${t} ${loc} ${note}`;
+                lastCard.style.display = 'flex';
+            } else {
+                lastCard.style.display = 'none';
+            }
+            renderCalendar();
+            UndoSystem.updateUI();
+        }
+
+        function populateHistoryLocationFilter(records) {
+            const select = document.getElementById('historyLocationFilter');
+            const prevValue = select.value;
+            const locations = [...new Set(records.map(r => r.location).filter(Boolean))].sort();
+            select.innerHTML = '<option value="">全部口岸</option>' +
+                locations.map(loc => `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}</option>`).join('');
+            if (locations.includes(prevValue)) select.value = prevValue;
+        }
+
+        function renderHistory() {
+            const allRecords = DataService.getRecords();
+            populateHistoryLocationFilter(allRecords);
+
+            const keyword = (document.getElementById('historySearchInput').value || '').trim().toLowerCase();
+            const locationFilter = document.getElementById('historyLocationFilter').value;
+
+            const filtered = allRecords.filter(r => {
+                if (locationFilter && r.location !== locationFilter) return false;
+                if (keyword) {
+                    const haystack = `${r.dateKey} ${r.location || ''} ${r.note || ''}`.toLowerCase();
+                    if (!haystack.includes(keyword)) return false;
+                }
+                return true;
+            });
+
+            const sorted = [...filtered].sort((a, b) => {
+                if (a.dateKey !== b.dateKey) return b.dateKey.localeCompare(a.dateKey);
+                return b.timestamp.localeCompare(a.timestamp);
+            });
+            const container = document.getElementById('historyList');
+            const isFiltering = keyword || locationFilter;
+            document.getElementById('historyCount').textContent = isFiltering ?
+                `筛选出 ${sorted.length} / ${allRecords.length} 条记录` :
+                `共 ${sorted.length} 条记录`;
+            if (sorted.length === 0) {
+                container.innerHTML = `<div class="empty">${isFiltering ? '没有符合筛选条件的记录' : '暂无记录，快去刷关吧！'}</div>`;
+                return;
+            }
+            let html = '';
+            sorted.forEach(r => {
+                const d = new Date(r.timestamp);
+                const t = (isDefaultTime(r.timestamp)) ? '' : ` ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                const safeLocation = escapeHtml(r.location);
+                const safeNote = escapeHtml(r.note);
+                const loc = r.location ? `📍 ${safeLocation}` : '';
+                const note = r.note ? `<div class="record-note">✏️ ${safeNote}</div>` : '';
+                html += `
+                    <div class="record-item" data-id="${escapeHtml(r.id)}">
+                        <div class="record-row">
+                            <div class="record-left">
+                                <span class="record-date">${escapeHtml(r.dateKey)}</span>
+                                <span class="record-time">${t}</span>
+                                ${loc ? `<span class="record-location">${loc}</span>` : ''}
+                            </div>
+                            <button class="record-delete" data-id="${escapeHtml(r.id)}">✕</button>
+                        </div>
+                        ${note}
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+            container.querySelectorAll('.record-delete').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const id = this.dataset.id;
+                    showConfirmDialog('删除这条记录？', function() {
+                        deleteRecordById(id);
+                        refreshAll();
+                        showToast('已删除');
+                    }, { title: '删除记录', danger: true, okText: '删除' });
+                });
+            });
+            UndoSystem.updateUI();
+        }
+
+        document.getElementById('historySearchInput').addEventListener('input', renderHistory);
+        document.getElementById('historyLocationFilter').addEventListener('change', renderHistory);
+
+        function renderSettings() {
+            document.getElementById('targetInput').value = DataService.getTarget();
+            const rt = DataService.getReminderTime();
+            document.getElementById('reminderStatus').textContent = rt ? `⏰ 提醒时间：${rt}` : '未设置提醒';
+            const mode = DataService.getRecordMode();
+            document.getElementById('modeToggle').checked = (mode === 'full');
+            if (mode === 'light') {
+                document.getElementById('modeLabelLight').classList.add('active');
+                document.getElementById('modeLabelFull').classList.remove('active');
+                document.getElementById('modeDesc').textContent = '纯打卡，可修改地点';
+            } else {
+                document.getElementById('modeLabelLight').classList.remove('active');
+                document.getElementById('modeLabelFull').classList.add('active');
+                document.getElementById('modeDesc').textContent = '支持备注与精确时间';
+            }
+            renderStorageUsage();
+        }
+
+        const ASSUMED_QUOTA_KB = 5120;
+
+        function renderStorageUsage() {
+            const usedKB = parseFloat(getStorageUsageKB());
+            const percent = Math.min(100, Math.round((usedKB / ASSUMED_QUOTA_KB) * 100));
+            const el = document.getElementById('storageUsageText');
+            const fill = document.getElementById('storageUsageFill');
+            if (!el || !fill) return;
+            el.textContent = `已使用约 ${usedKB} KB（预估上限 ${ASSUMED_QUOTA_KB / 1024}MB 左右，因浏览器而异）`;
+            fill.style.width = percent + '%';
+            fill.style.background = percent >= 80 ? 'var(--danger)' : 'var(--primary)';
+            if (percent >= 80) {
+                el.style.color = 'var(--danger)';
+                el.textContent += '　⚠️ 空间快用完了，建议导出备份并清理旧数据';
+            } else {
+                el.style.color = '';
+            }
+        }
+
+        function refreshAll() {
+            renderIndex();
+            renderHistory();
+            renderSettings();
+        }
+
+        // ================================================================
+        // 17. 日历切换
+        // ================================================================
+        document.getElementById('prevMonth').addEventListener('click', function() {
+            currentMonth--;
+            if (currentMonth < 0) { currentMonth = 11;
+                currentYear--; }
+            renderCalendar();
+        });
+        document.getElementById('nextMonth').addEventListener('click', function() {
+            currentMonth++;
+            if (currentMonth > 11) { currentMonth = 0;
+                currentYear++; }
+            renderCalendar();
+        });
+
+        // ================================================================
+        // 18. 清空全部
+        // ================================================================
+        document.getElementById('btnClear').addEventListener('click', function() {
+            showConfirmDialog('⚠️ 确认删除所有打卡记录吗？此操作可撤销（点击"撤销"恢复）', function() {
+                const all = DataService.getRecords();
+                const ok = DataService.saveRecords([]);
+                if (ok && all.length > 0) UndoSystem.recordDeleteDate('all', all);
+                refreshAll();
+                if (handleSaveResult(ok)) showToast('已清空所有记录（可撤销）');
+            }, { title: '清空全部', danger: true, okText: '清空' });
+        });
+
+        // ================================================================
+        // 19. 保存目标
+        // ================================================================
+        document.getElementById('btnSaveTarget').addEventListener('click', function() {
+            const v = parseInt(document.getElementById('targetInput').value);
+            if (isNaN(v) || v < 1 || v > 366) { showToast('请输入 1-366 之间的整数'); return; }
+            DataService.saveTarget(v);
+            DataService.setCongratsTarget(0);
+            refreshAll();
+            showToast('✅ 目标已保存');
+        });
+
+        // ================================================================
+        // 20. 主题切换
+        // ================================================================
+        const themeToggle = document.getElementById('themeToggle');
+        const themeMap = ['light', 'dark', 'green'];
+        const iconMap = ['☀️', '🌙', '🌿'];
+        let themeIndex = 0;
+
+        function applyThemeByIndex(index) {
+            const theme = themeMap[index];
+            document.documentElement.setAttribute('data-theme', theme === 'light' ? '' : theme);
+            themeToggle.textContent = iconMap[index];
+            DataService.saveThemeIndex(index);
+            themeIndex = index;
+        }
+        const savedThemeIndex = DataService.getThemeIndex();
+        applyThemeByIndex(savedThemeIndex);
+        themeToggle.addEventListener('click', function() {
+            applyThemeByIndex((themeIndex + 1) % 3);
+        });
+
+        // ================================================================
+        // 21. 导出/导入
+        // ================================================================
+        document.getElementById('exportMenuBtn').addEventListener('click', function() {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.tab[data-page="settings"]').classList.add('active');
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-settings').classList.add('active');
+            renderSettings();
+        });
+
+        document.getElementById('exportJSON').addEventListener('click', function() {
+            const data = DataService.getRecords();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            downloadBlob(blob, `打卡记录_${getTodayKey()}.json`);
+            showToast('✅ JSON 已导出');
+        });
+        document.getElementById('exportCSV').addEventListener('click', function() {
+            const data = DataService.getRecords();
+            if (data.length === 0) { showToast('暂无记录可导出'); return; }
+            let csv = '日期,时间,地点,备注\n';
+            data.forEach(r => {
+                const d = new Date(r.timestamp);
+                const t = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                const cleanNote = (r.note || '').replace(/\r\n|\r|\n/g, ' ');
+                const cleanLocation = (r.location || '').replace(/\r\n|\r|\n/g, ' ');
+                csv += `${r.dateKey},${t},"${cleanLocation.replace(/"/g, '""')}","${cleanNote.replace(/"/g, '""')}"\n`;
+            });
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            downloadBlob(blob, `打卡记录_${getTodayKey()}.csv`);
+            showToast('✅ CSV 已导出');
+        });
+
+        function downloadBlob(blob, filename) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+        document.getElementById('importBtn').addEventListener('click', function() {
+            document.getElementById('importFileInput').click();
+        });
+
+        function isValidRecord(r) {
+            if (!r || typeof r !== 'object') return false;
+            if (typeof r.id !== 'string' && typeof r.id !== 'number') return false;
+            if (typeof r.dateKey !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(r.dateKey)) return false;
+            if (typeof r.timestamp !== 'string' || isNaN(new Date(r.timestamp).getTime())) return false;
+            if (r.location !== undefined && typeof r.location !== 'string') return false;
+            if (r.note !== undefined && typeof r.note !== 'string') return false;
+            return true;
+        }
+
+        document.getElementById('importFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if (!Array.isArray(data)) {
+                        showToast('❌ 数据格式错误：应为数组');
+                        return;
+                    }
+                    const invalidCount = data.filter(r => !isValidRecord(r)).length;
+                    if (invalidCount > 0) {
+                        showToast(`❌ 数据格式错误：发现 ${invalidCount} 条无效记录`);
+                        return;
+                    }
+                    const cleaned = data.map(r => ({
+                        id: String(r.id),
+                        userId: typeof r.userId === 'string' && r.userId ? r.userId : DataService.getUserId(),
+                        dateKey: r.dateKey,
+                        timestamp: new Date(r.timestamp).toISOString(),
+                        location: String(r.location || '').slice(0, 50),
+                        note: String(r.note || '').slice(0, 200)
+                    }));
+                    showConfirmDialog(`即将导入 ${cleaned.length} 条记录，当前数据将被完全替换。是否继续？`, function() {
+                        const ok = DataService.importRecords(cleaned);
+                        if (ok) UndoSystem.clear();
+                        refreshAll();
+                        if (handleSaveResult(ok)) showToast(`✅ 成功导入 ${cleaned.length} 条记录`);
+                    }, { title: '导入数据', danger: true, okText: '导入' });
+                } catch (err) { showToast('❌ 文件解析失败'); }
+            };
+            reader.readAsText(file);
+            this.value = '';
+        });
+
+        // ================================================================
+        // 22. 自动备份提醒（每月1号）
+        // ================================================================
+        function checkBackupReminder() {
+            const today = new Date();
+            if (today.getDate() === 1) {
+                const last = localStorage.getItem('_lastBackupReminder');
+                const todayStr = getTodayKey();
+                if (last !== todayStr) {
+                    setTimeout(() => {
+                        showConfirmDialog('📅 今天是月初，要不要导出备份一下你的打卡数据？', function() {
+                            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                            document.querySelector('.tab[data-page="settings"]').classList.add('active');
+                            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                            document.getElementById('page-settings').classList.add('active');
+                            renderSettings();
+                        }, { title: '备份提醒', okText: '去导出' });
+                        localStorage.setItem('_lastBackupReminder', todayStr);
+                    }, 2000);
+                }
+            }
+        }
+
+        // ================================================================
+        // 23. 每日提醒
+        // ================================================================
+        let reminderCheckInterval = null;
+
+        function checkReminder() {
+            const reminderTime = DataService.getReminderTime();
+            if (!reminderTime) return;
+            const now = new Date();
+            const current = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            const todayKey = getTodayKey();
+            if (current === reminderTime && DataService.getReminderLastFiredDate() !== todayKey) {
+                if (Notification.permission === 'granted') {
+                    const stats = calcStats();
+                    new Notification('📌 今日打卡提醒', {
+                        body: `今天还没打卡哦！本月已完成 ${stats.completed}/${stats.target} 天，还差 ${stats.remaining} 天。`,
+                        icon: '📅'
+                    });
+                }
+                DataService.saveReminderLastFiredDate(todayKey);
+            }
+        }
+        if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+
+        document.getElementById('reminderBtn').addEventListener('click', function() {
+            const cur = DataService.getReminderTime() || '20:00';
+            document.getElementById('reminderTime').value = cur;
+            document.getElementById('reminderModal').classList.add('active');
+            checkNightTime(cur);
+        });
+        document.getElementById('reminderTime').addEventListener('change', function() { checkNightTime(this.value); });
+
+        function checkNightTime(timeStr) {
+            const hour = parseInt(timeStr.split(':')[0]) || 0;
+            const subInfo = document.getElementById('reminderSubInfo');
+            if (hour >= 22 || hour < 6) {
+                subInfo.textContent = '🌙 深夜时段提醒，可能会打扰休息哦';
+                subInfo.style.color = 'var(--danger)';
+            } else {
+                subInfo.textContent = '设置每日提醒时间（浏览器需授权通知）';
+                subInfo.style.color = '';
+            }
+        }
+        document.getElementById('reminderCancel').addEventListener('click', () => {
+            document.getElementById('reminderModal').classList.remove('active');
+        });
+        document.getElementById('reminderModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) document.getElementById('reminderModal').classList.remove('active');
+        });
+        document.getElementById('reminderConfirm').addEventListener('click', function() {
+            const t = document.getElementById('reminderTime').value;
+            if (!t) { showToast('请选择时间'); return; }
+            function commitReminder() {
+                DataService.saveReminderTime(t);
+                DataService.saveReminderLastFiredDate('');
+                showToast('✅ 提醒设置成功');
+                renderSettings();
+                document.getElementById('reminderModal').classList.remove('active');
+                startReminderCheck();
+            }
+            if (Notification.permission !== 'granted') {
+                Notification.requestPermission().then(p => {
+                    if (p === 'granted') {
+                        commitReminder();
+                    } else { showToast('请允许浏览器通知权限'); }
+                });
+            } else {
+                commitReminder();
+            }
+        });
+
+        function startReminderCheck() {
+            if (reminderCheckInterval) clearInterval(reminderCheckInterval);
+            reminderCheckInterval = setInterval(checkReminder, 10000);
+        }
+        startReminderCheck();
+
+        // ================================================================
+        // 24. 海报
+        // ================================================================
+        document.getElementById('posterBtn').addEventListener('click', function() {
+            document.getElementById('posterModal').classList.add('active');
+            generatePoster();
+        });
+        document.getElementById('posterClose').addEventListener('click', () => {
+            document.getElementById('posterModal').classList.remove('active');
+        });
+        document.getElementById('posterModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) document.getElementById('posterModal').classList.remove('active');
+        });
+
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+                if (r > w / 2) r = w / 2;
+                if (r > h / 2) r = h / 2;
+                this.moveTo(x + r, y);
+                this.lineTo(x + w - r, y);
+                this.quadraticCurveTo(x + w, y, x + w, y + r);
+                this.lineTo(x + w, y + h - r);
+                this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+                this.lineTo(x + r, y + h);
+                this.quadraticCurveTo(x, y + h, x, y + h - r);
+                this.lineTo(x, y + r);
+                this.quadraticCurveTo(x, y, x + r, y);
+                return this;
+            };
+        }
+
+        function generatePoster() {
+            const canvas = document.getElementById('posterCanvas');
+            const ctx = canvas.getContext('2d');
+            const W = 360,
+                H = 500;
+            canvas.width = W;
+            canvas.height = H;
+            const stats = calcStats();
+            const theme = document.documentElement.getAttribute('data-theme') || 'light';
+            const isDark = theme === 'dark';
+            const isGreen = theme === 'green';
+            let bg1, bg2, textColor, primaryColor, dangerColor, lightText;
+            if (isDark) {
+                bg1 = '#1e2a2a';
+                bg2 = '#0a0f0f';
+                textColor = '#e0e0e0';
+                primaryColor = '#4db6ac';
+                dangerColor = '#ef9a9a';
+                lightText = '#777';
+            } else if (isGreen) {
+                bg1 = '#e8f5e9';
+                bg2 = '#c8e6c9';
+                textColor = '#1a3a1a';
+                primaryColor = '#4caf50';
+                dangerColor = '#e57373';
+                lightText = '#6a8a6a';
+            } else {
+                bg1 = '#f0f4f3';
+                bg2 = '#dce8e6';
+                textColor = '#1a2a2a';
+                primaryColor = '#2b7a78';
+                dangerColor = '#e85d75';
+                lightText = '#999';
+            }
+            const grad = ctx.createLinearGradient(0, 0, 0, H);
+            grad.addColorStop(0, bg1);
+            grad.addColorStop(1, bg2);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, H);
+            ctx.beginPath();
+            ctx.arc(W - 40, 40, 80, 0, Math.PI * 2);
+            ctx.fillStyle = isDark ? 'rgba(77, 182, 172, 0.1)' : isGreen ? 'rgba(76, 175, 80, 0.08)' : 'rgba(43, 122, 120, 0.08)';
+            ctx.fill();
+            ctx.fillStyle = textColor;
+            ctx.font = 'bold 26px -apple-system, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('🚀 刷关打卡', W / 2, 70);
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 48px -apple-system, sans-serif';
+            ctx.fillStyle = primaryColor;
+            ctx.fillText(stats.completed, W / 2 - 70, 160);
+            ctx.fillStyle = lightText;
+            ctx.font = '16px -apple-system, sans-serif';
+            ctx.fillText('已完成', W / 2 - 70, 190);
+            ctx.font = 'bold 48px -apple-system, sans-serif';
+            ctx.fillStyle = lightText;
+            ctx.fillText('/ ' + stats.target, W / 2 + 40, 160);
+            ctx.fillStyle = dangerColor;
+            ctx.font = 'bold 52px -apple-system, sans-serif';
+            ctx.fillText(stats.remaining, W / 2, 260);
+            ctx.fillStyle = lightText;
+            ctx.font = '16px -apple-system, sans-serif';
+            ctx.fillText('还差 ' + stats.remaining + ' 天', W / 2, 290);
+            const barX = 40,
+                barY = 320,
+                barW = W - 80,
+                barH = 14;
+            ctx.fillStyle = isDark ? '#333' : isGreen ? '#c8e6c9' : '#e8ecec';
+            ctx.beginPath();
+            ctx.roundRect(barX, barY, barW, barH, 7);
+            ctx.fill();
+            const fillW = Math.min(barW, (stats.completed / Math.max(1, stats.target)) * barW);
+            ctx.fillStyle = primaryColor;
+            ctx.beginPath();
+            ctx.roundRect(barX, barY, fillW, barH, 7);
+            ctx.fill();
+            ctx.fillStyle = lightText;
+            ctx.font = '13px -apple-system, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(stats.progress + '%', W / 2, barY + barH + 22);
+            const streak = calcStreak();
+            ctx.fillStyle = lightText;
+            ctx.font = '14px -apple-system, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`🔥 连续打卡 ${streak} 天`, W / 2, 375);
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}.${today.getMonth()+1}.${today.getDate()}`;
+            ctx.fillStyle = lightText;
+            ctx.font = '12px -apple-system, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`生成于 ${dateStr}  记录工具 v1.2`, W / 2, H - 30);
+            if (stats.records.length > 0) {
+                const last = stats.records[stats.records.length - 1];
+                const d = new Date(last.timestamp);
+                const t = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                ctx.fillStyle = lightText;
+                ctx.font = '11px -apple-system, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`最近打卡：${last.dateKey} ${t}`, W / 2, 410);
+            }
+        }
+        document.getElementById('posterDownload').addEventListener('click', function() {
+            const canvas = document.getElementById('posterCanvas');
+            const link = document.createElement('a');
+            link.download = `打卡海报_${getTodayKey()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            showToast('✅ 海报已保存');
+        });
+
+        // ================================================================
+        // 25. 导航切换
+        // ================================================================
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const page = this.dataset.page;
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById('page-' + page).classList.add('active');
+                if (page === 'history') renderHistory();
+                if (page === 'settings') renderSettings();
+            });
+        });
+
+        // ================================================================
+        // 26. 分享功能（已移除）
+        // ================================================================
+
+        // ================================================================
+        // 27. 关于弹窗
+        // ================================================================
+        document.getElementById('aboutBtn').addEventListener('click', function() {
+            document.getElementById('aboutModal').classList.add('active');
+        });
+        document.getElementById('aboutClose').addEventListener('click', function() {
+            document.getElementById('aboutModal').classList.remove('active');
+        });
+        document.getElementById('aboutModal').addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('active');
+        });
+
+        // ================================================================
+        // 28. Service Worker 注册
+        // ================================================================
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(function(reg) {
+                console.log('Service Worker registered:', reg.scope);
+            }).catch(function(err) {
+                console.warn('Service Worker registration failed:', err);
+            });
+        }
+
+        // ================================================================
+        // 29. 多标签页同步
+        // ================================================================
+        const SYNC_WATCHED_KEYS = new Set([
+            DataService._key, DataService._targetKey, DataService._modeKey
+        ]);
+        window.addEventListener('storage', function(e) {
+            if (!e.key || SYNC_WATCHED_KEYS.has(e.key)) {
+                showToast('🔄 检测到数据在其他标签页有更新，已同步刷新');
+                refreshAll();
+            }
+        });
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') refreshAll();
+        });
+
+        // ================================================================
+        // 30. 初始化
+        // ================================================================
+        const localUserIdEl = document.getElementById('localUserIdDisplay');
+        if (localUserIdEl) localUserIdEl.textContent = DataService.getUserId();
+        refreshAll();
+        checkBackupReminder();
+        console.log('💡 刷关记录器已启动 v1.2（精简版：移除分享按钮，精简关于文案）');
+    </script>
+
+</body>
+</html>
